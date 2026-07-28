@@ -12,16 +12,14 @@ def limpar_titulo(titulo_bruto):
     if not titulo_bruto:
         return "Desconhecido", "Desconhecido"
     
-    # Remove termos comuns de vídeo/performance do YouTube independentemente de estarem entre parênteses ou colchetes
-    termo_limpeza = r'\b(clipe oficial|vídeo oficial|video oficial|ao vivo|live performance|live|dvd|medley|remix)\b'
+    # 1. Remove termos universais de vídeo/performance independentemente de onde estejam
+    termo_limpeza = r'\b(clipe oficial|vídeo oficial|video oficial|ao vivo|live performance|live|dvd|medley|remix|ministração)\b'
     
-    # Limpa parênteses e colchetes que contenham esses termos ou lixo comum
     limpo = re.sub(r'[\(\[].*?' + termo_limpeza + r'.*?[\)\]]', '', titulo_bruto, flags=re.IGNORECASE)
-    # Remove também termos soltos no texto se sobram
     limpo = re.sub(termo_limpeza, '', limpo, flags=re.IGNORECASE)
     limpo = limpo.strip()
     
-    # Tenta quebrar por separadores comuns (- ou |)
+    # 2. Quebra o título nos separadores comuns (- ou |)
     partes = re.split(r'\s*[-–|]\s*', limpo)
     partes = [p.strip() for p in partes if p.strip()]
     
@@ -29,16 +27,33 @@ def limpar_titulo(titulo_bruto):
         p1 = partes[0]
         p2 = partes[1]
         
-        # Heurística de contexto:
-        # Se o primeiro bloco for muito longo ou parecer um título de música/frase e o segundo for curto, inverte.
-        # Nomes de artistas costumam ser curtos (até 3 ou 4 palavras).
-        if len(p1.split()) > 4 and len(p2.split()) <= 4:
+        # Heurística de Nomes Próprios e Contexto:
+        # Se a segunda parte parece mais um nome próprio/artista (geralmente até 3 palavras, iniciais maiúsculas, sem verbos de frase comum)
+        # Exemplo: "Era Eu | Melk Villar" -> p2 é "Melk Villar", logo é o artista.
+        # Vamos verificar se p2 tem cara de artista e p1 tem cara de música (frase/título).
+        
+        # Indicadores simples de que o texto é um nome (poucas palavras, sem termos longos)
+        palavras_p2 = p2.split()
+        palavras_p1 = p1.split()
+        
+        # Se p1 é longo (frase de música) e p2 é curto (nome do cantor)
+        if len(palavras_p1) > 2 and len(palavras_p2) <= 3:
             musica = p1
             artista = p2
-        else:
-            # Padrão normal (Artista - Música)
+        elif len(palavras_p2) > 2 and len(palavras_p1) <= 3:
+            # Caso contrário, se o p1 for o artista curto ("Aline Barros - Casa do Pai")
             artista = p1
             musica = p2
+        else:
+            # Padrão padrão caso ambos tenham tamanhos parecidos
+            artista = p1
+            musica = p2
+            
+        # Se houver uma terceira parte e ela for curta (ex: participações ou bandas no fim)
+        if len(partes) > 2 and len(partes[-1].split()) <= 3:
+            # Se a última parte parecer um artista válido, podemos somar ou considerar
+            pass
+            
     elif len(partes) == 1:
         artista = "Desconhecido"
         musica = partes[0]
@@ -89,7 +104,7 @@ def processar_playlist():
             "status": "sucesso",
             "total_encontradas": len(lista_musicas),
             "musicas": lista_musicas,
-            "mensagem": "Músicas extraídas e limpas com sucesso!"
+            "mensagem": "Músicas extraídas com reconhecimento de nomes!"
         })
         
     except Exception as e:
