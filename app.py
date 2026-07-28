@@ -16,7 +16,7 @@ def processar_playlist():
         return jsonify({"erro": "Nenhum link enviado"}), 400
         
     try:
-        # Configuração do yt-dlp para extrair apenas os dados da playlist sem baixar vídeos
+        # Extrai as músicas da playlist de origem do YouTube
         ydl_opts = {
             'extract_flat': True,
             'skip_download': True,
@@ -26,7 +26,6 @@ def processar_playlist():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(link_youtube, download=False)
             
-            # Se for uma playlist, percorre os itens
             if 'entries' in info:
                 for entry in info['entries']:
                     titulo = entry.get('title')
@@ -34,15 +33,16 @@ def processar_playlist():
                         "titulo": titulo
                     })
             else:
-                # Se for apenas um vídeo solto
                 lista_musicas.append({
                     "titulo": info.get('title')
                 })
 
+        # Retorna a lista extraída (pronta para ser enviada ao YouTube Music)
         return jsonify({
             "status": "sucesso",
             "total_encontradas": len(lista_musicas),
-            "musicas": lista_musicas
+            "musicas": lista_musicas,
+            "mensagem": "Músicas extraídas com sucesso da playlist de origem!"
         })
         
     except Exception as e:
