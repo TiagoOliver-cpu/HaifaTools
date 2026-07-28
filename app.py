@@ -12,31 +12,39 @@ def limpar_titulo(titulo_bruto):
     if not titulo_bruto:
         return "Desconhecido", "Desconhecido"
     
-    # Remove sujeiras comuns do YouTube do título inteiro primeiro
-    limpo = re.sub(r'\(.*?(oficial|live|ao vivo|clipe|video|performance|medley|dvd).*?\)', '', titulo_bruto, flags=re.IGNORECASE)
-    limpo = re.sub(r'\[.*?(oficial|live|ao vivo|clipe|video|performance|medley|dvd).*?\]', '', limpo, flags=re.IGNORECASE)
+    # Remove termos comuns de vídeo/performance do YouTube independentemente de estarem entre parênteses ou colchetes
+    termo_limpeza = r'\b(clipe oficial|vídeo oficial|video oficial|ao vivo|live performance|live|dvd|medley|remix)\b'
+    
+    # Limpa parênteses e colchetes que contenham esses termos ou lixo comum
+    limpo = re.sub(r'[\(\[].*?' + termo_limpeza + r'.*?[\)\]]', '', titulo_bruto, flags=re.IGNORECASE)
+    # Remove também termos soltos no texto se sobram
+    limpo = re.sub(termo_limpeza, '', limpo, flags=re.IGNORECASE)
     limpo = limpo.strip()
     
     # Tenta quebrar por separadores comuns (- ou |)
     partes = re.split(r'\s*[-–|]\s*', limpo)
+    partes = [p.strip() for p in partes if p.strip()]
     
     if len(partes) >= 2:
-        # Analisa os pedaços para tentar deduzir o contexto
-        # Normalmente o artista é o nome mais curto ou o que aparece isolado
-        # Vamos assumir uma regra inteligente padrão: parte 1 = Artista / parte 2 = Música (ou vice-versa dependendo do tamanho)
-        p1 = partes[0].strip()
-        p2 = partes[1].strip()
+        p1 = partes[0]
+        p2 = partes[1]
         
-        # Se a primeira parte for muito longa (ex: nome de medley grande), inverte ou trata
-        if len(p1) > 30 and len(p2) < 30:
-            artista = p2
+        # Heurística de contexto:
+        # Se o primeiro bloco for muito longo ou parecer um título de música/frase e o segundo for curto, inverte.
+        # Nomes de artistas costumam ser curtos (até 3 ou 4 palavras).
+        if len(p1.split()) > 4 and len(p2.split()) <= 4:
             musica = p1
+            artista = p2
         else:
+            # Padrão normal (Artista - Música)
             artista = p1
             musica = p2
+    elif len(partes) == 1:
+        artista = "Desconhecido"
+        musica = partes[0]
     else:
         artista = "Desconhecido"
-        musica = limpo
+        musica = titulo_bruto
         
     return artista, musica
 
@@ -81,7 +89,7 @@ def processar_playlist():
             "status": "sucesso",
             "total_encontradas": len(lista_musicas),
             "musicas": lista_musicas,
-            "mensagem": "Músicas extraídas com análise de contexto!"
+            "mensagem": "Músicas extraídas e limpas com sucesso!"
         })
         
     except Exception as e:
