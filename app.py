@@ -12,42 +12,41 @@ def limpar_titulo(titulo_bruto):
     if not titulo_bruto:
         return "Desconhecido", "Desconhecido"
     
-    # 1. Remove termos técnicos de gravação, câmeras e plataformas do meio do caminho
+    # 1. Remove termos técnicos e de gravação do final do texto
     titulo_limpo = re.sub(r'\b(keycam|live performance|clipe oficial|vídeo oficial|video oficial|ao vivo|dvd|medley|remix|ministração)\b', '', titulo_bruto, flags=re.IGNORECASE)
+    titulo_limpo = titulo_limpo.strip()
     
-    # Remove parênteses e colchetes vazios ou residuais
-    titulo_limpo = re.sub(r'[\(\[\{].*?[\)\]\}]', '', titulo_limpo)
+    # 2. Identifica o separador principal que divide a Música e o Artista.
+    # No caso de "TU ÉS DEUS (A ELE) - O Canto das Igrejas...", queremos que o hífen principal 
+    # seja o que separa o nome da música (incluindo o (A ELE)) do grupo de artistas.
+    # Vamos procurar o primeiro hífen ou travessão que vem DEPOIS de parênteses, se houver.
     
-    # 2. Divide os blocos por qualquer separador comum (- , – , |)
-    partes = re.split(r'\s*[-–|]\s*', titulo_limpo)
-    partes = [p.strip() for p in partes if p.strip()]
-    
-    if len(partes) >= 3:
-        # Se tem muitos blocos (ex: "Tu És Deus + Sublime", "KeyCam", "Francesco Xavier")
-        # O nome da música geralmente é o primeiro bloco
-        musica = partes[0]
-        # O artista real costuma estar no último bloco válido se o do meio for marca técnica
-        artista = partes[-1]
-    elif len(partes) == 2:
-        # Verifica se o padrão veio invertido (Música | Artista ou Artista - Música)
-        # Se a primeira parte tem características de música (frase longa/medley) e a segunda de artista
-        p1, p2 = partes[0], partes[1]
+    # Se tem barra vertical "|", o padrão costuma ser Música | Artista
+    if '|' in titulo_limpo:
+        partes = titulo_limpo.split('|')
+        musica = partes[0].strip()
+        artista = partes[1].strip() if len(partes) > 1 else "Desconhecido"
+        return artista, musica
+
+    # Para hífens/travessões (-)
+    # Procuramos o split de forma inteligente: se o título tem parênteses, o artista geralmente vem após o último hífen principal
+    if '-' in titulo_limpo or '–' in titulo_limpo:
+        # Divide mantendo o contexto
+        partes = re.split(r'\s*[-–]\s*', titulo_limpo)
+        partes = [p.strip() for p in partes if p.strip()]
         
-        # Se contiver "+" ou parecer título de canção no primeiro bloco e nome no segundo
-        if '+' in p1 or len(p1.split()) > 3:
-            musica = p1
-            artista = p2
-        else:
-            artista = p1
-            musica = p2
-    elif len(partes) == 1:
-        musica = partes[0]
-        artista = "Desconhecido"
-    else:
-        musica = titulo_bruto
-        artista = "Desconhecido"
-        
-    return artista, musica
+        if len(partes) >= 2:
+            # Se a primeira parte tem parênteses abertos e fechados logo no começo, ou se é o título principal
+            # Vamos juntar as partes iniciais caso o título tenha sido cortado por um hífen interno (ex: "TU ÉS DEUS (A ELE)")
+            if '(' in partes[0] and ')' not in partes[0] and len(partes) >= 3:
+                musica = f"{partes[0]} - {partes[1]}"
+                artista = " - ".join(partes[2:])
+            else:
+                musica = partes[0]
+                artista = " - ".join(partes[1:])
+            return artista, musica
+
+    return "Desconhecido", titulo_limpo
 
 @app.route('/processar', methods=['POST'])
 def processar_playlist():
@@ -85,7 +84,7 @@ def processar_playlist():
             "status": "sucesso",
             "total_encontradas": len(lista_musicas),
             "musicas": lista_musicas,
-            "mensagem": "Músicas extraídas ignorando marcas técnicas!"
+            "mensagem": "Músicas extraídas com correção de hífens internos!"
         })
         
     except Exception as e:
