@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro e Histórico de Músicas</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 30px auto; padding: 20px; background-color: #f9f9f9; color: #333; }
+        h1, h2 { color: #2c3e50; }
+        form { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px; }
+        label { display: block; margin-top: 10px; font-weight: bold; }
+        input[type="text"], input[type="date"] { width: 100%; padding: 8px; margin-top: 5px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background-color: #27ae60; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; width: 100%; }
+        button:hover { background-color: #219653; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #2c3e50; color: white; }
+        tr:hover { background-color: #f1f1f1; }
+    </style>
+</head>
+<body>
+
+    <h1>Cadastro de Músicas</h1>
+    <form id="musicForm">
+        <label for="artist">Artista:</label>
+        <input type="text" id="artist" required placeholder="Ex: Nome do Artista">
+
+        <label for="song">Música:</label>
+        <input type="text" id="song" required placeholder="Ex: Nome da Música">
+
+        <label for="date">Data:</label>
+        <input type="date" id="date" required>
+
+        <button type="submit">Salvar no Histórico</button>
+    </form>
+
+    <h2>Histórico de Canções</h2>
+    <table id="historyTable">
+        <thead>
+            <tr>
+                <th>Artista</th>
+                <th>Música</th>
+                <th>Data</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Os dados salvos aparecerão aqui -->
+        </tbody>
+    </table>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', carregarHistorico);
+
+        const form = document.getElementById('musicForm');
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const artist = document.getElementById('artist').value;
+            const song = document.getElementById('song').value;
+            const date = document.getElementById('date').value;
+
+            const novoRegistro = { artist, song, date };
+
+            let historico = JSON.parse(localStorage.getItem('historicoMusicas')) || [];
+            historico.push(novoRegistro);
+            localStorage.setItem('historicoMusicas', JSON.stringify(historico));
+
+            form.reset();
+            carregarHistorico();
+        });
+
+        function carregarHistorico() {
+            const tbody = document.querySelector('#historyTable tbody');
+            tbody.innerHTML = '';
+
+            let historico = JSON.parse(localStorage.getItem('historicoMusicas')) || [];
+
+            historico.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.artist}</td>
+                    <td>${item.song}</td>
+                    <td>${item.date.split('-').reverse().join('/')}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    </script>
+
+</body>
+</html>
