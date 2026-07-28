@@ -12,21 +12,32 @@ def limpar_titulo(titulo_bruto):
     if not titulo_bruto:
         return "Desconhecido", "Desconhecido"
     
-    # Tenta separar por hífen comum ou travessão (-)
-    partes = re.split(r'\s*[-–]\s*', titulo_bruto, maxsplit=1)
+    # Remove sujeiras comuns do YouTube do título inteiro primeiro
+    limpo = re.sub(r'\(.*?(oficial|live|ao vivo|clipe|video|performance|medley|dvd).*?\)', '', titulo_bruto, flags=re.IGNORECASE)
+    limpo = re.sub(r'\[.*?(oficial|live|ao vivo|clipe|video|performance|medley|dvd).*?\]', '', limpo, flags=re.IGNORECASE)
+    limpo = limpo.strip()
     
-    if len(partes) == 2:
-        artista = partes[0].strip()
-        musica = partes[1].strip()
+    # Tenta quebrar por separadores comuns (- ou |)
+    partes = re.split(r'\s*[-–|]\s*', limpo)
+    
+    if len(partes) >= 2:
+        # Analisa os pedaços para tentar deduzir o contexto
+        # Normalmente o artista é o nome mais curto ou o que aparece isolado
+        # Vamos assumir uma regra inteligente padrão: parte 1 = Artista / parte 2 = Música (ou vice-versa dependendo do tamanho)
+        p1 = partes[0].strip()
+        p2 = partes[1].strip()
+        
+        # Se a primeira parte for muito longa (ex: nome de medley grande), inverte ou trata
+        if len(p1) > 30 and len(p2) < 30:
+            artista = p2
+            musica = p1
+        else:
+            artista = p1
+            musica = p2
     else:
         artista = "Desconhecido"
-        musica = titulo_bruto.strip()
+        musica = limpo
         
-    # Remove sujeiras comuns do YouTube do título da música (ex: (Clipe Oficial), [Ao Vivo], etc)
-    musica = re.sub(r'\(.*?(oficial|live|ao vivo|clipe|video).*?\)', '', musica, flags=re.IGNORECASE)
-    musica = re.sub(r'\[.*?(oficial|live|ao vivo|clipe|video).*?\]', '', musica, flags=re.IGNORECASE)
-    musica = musica.strip()
-    
     return artista, musica
 
 @app.route('/processar', methods=['POST'])
@@ -70,7 +81,7 @@ def processar_playlist():
             "status": "sucesso",
             "total_encontradas": len(lista_musicas),
             "musicas": lista_musicas,
-            "mensagem": "Músicas extraídas e limpas com sucesso!"
+            "mensagem": "Músicas extraídas com análise de contexto!"
         })
         
     except Exception as e:
