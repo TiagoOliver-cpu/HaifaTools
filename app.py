@@ -8,59 +8,51 @@ app = Flask(__name__)
 def home():
     return "Bot de Playlists da HaifaTools está rodando com sucesso!"
 
-def limpar_titulo(titulo_bruto):
+def extrair_metadados(titulo_bruto, descricao_bruta):
     if not titulo_bruto:
         return "Desconhecido", "Desconhecido"
     
-    # 1. Remove termos universais de vídeo/performance independentemente de onde estejam
-    termo_limpeza = r'\b(clipe oficial|vídeo oficial|video oficial|ao vivo|live performance|live|dvd|medley|remix|ministração)\b'
-    
-    limpo = re.sub(r'[\(\[].*?' + termo_limpeza + r'.*?[\)\]]', '', titulo_bruto, flags=re.IGNORECASE)
-    limpo = re.sub(termo_limpeza, '', limpo, flags=re.IGNORECASE)
-    limpo = limpo.strip()
-    
-    # 2. Quebra o título nos separadores comuns (- ou |)
-    partes = re.split(r'\s*[-–|]\s*', limpo)
-    partes = [p.strip() for p in partes if p.strip()]
-    
-    if len(partes) >= 2:
-        p1 = partes[0]
-        p2 = partes[1]
+    artista = "Desconhecido"
+    musica = ""
+
+    # 1. Tenta buscar padrões explícitos dentro da DESCRIÇÃO do vídeo (onde geralmente estão os créditos oficiais)
+    if descricao_bruta:
+        # Procura por linhas como "Artista: X" ou "Cantor: X" ou "Música: Y"
+        match_artista = re.search(r'(?:artista|cantor|interpret[eé]|voz):\s*([^\n]+)', descricao_bruta, re.IGNORECASE)
+        match_musica = re.search(r'(?:música|faixa|canção|track):\s*([^\n]+)', descricao_bruta, re.IGNORECASE)
         
-        # Heurística de Nomes Próprios e Contexto:
-        # Se a segunda parte parece mais um nome próprio/artista (geralmente até 3 palavras, iniciais maiúsculas, sem verbos de frase comum)
-        # Exemplo: "Era Eu | Melk Villar" -> p2 é "Melk Villar", logo é o artista.
-        # Vamos verificar se p2 tem cara de artista e p1 tem cara de música (frase/título).
+        if match_artista:
+            artista = match_artista.group(1).strip()
+        if match_musica:
+            musica = match_musica.group(1).strip()
+
+    # 2. Se não achou na descrição, recorre à inteligência de limpeza do TÍTULO
+    if artista == "Desconhecido" or not musica:
+        # Remove termos comuns de vídeo/performance do título
+        termo_limpeza = r'\b(clipe oficial|vídeo oficial|video oficial|ao vivo|live performance|live|dvd|medley|remix|ministração)\b'
+        limpo = re.sub(r'[\(\[].*?' + termo_limpeza + r'.*?[\)\]]', '', titulo_bruto, flags=re.IGNORECASE)
+        limpo = re.sub(termo_limpeza, '', limpo, flags=re.IGNORECASE)
+        limpo = limpo.strip()
         
-        # Indicadores simples de que o texto é um nome (poucas palavras, sem termos longos)
-        palavras_p2 = p2.split()
-        palavras_p1 = p1.split()
+        partes = re.split(r'\s*[-–|]\s*', limpo)
+        partes = [p.strip() for p in partes if p.strip()]
         
-        # Se p1 é longo (frase de música) e p2 é curto (nome do cantor)
-        if len(palavras_p1) > 2 and len(palavras_p2) <= 3:
-            musica = p1
-            artista = p2
-        elif len(palavras_p2) > 2 and len(palavras_p1) <= 3:
-            # Caso contrário, se o p1 for o artista curto ("Aline Barros - Casa do Pai")
-            artista = p1
-            musica = p2
+        if len(partes) >= 2:
+            p1 = partes[0]
+            p2 = partes[1]
+            
+            # Se a primeira parte for longa e a segunda curta (ex: "Era Eu | Melk Villar"), inverte para achar o artista
+            if len(p1.split()) > 2 and len(p2.split()) <= 3:
+                musica = p1
+                artista = p2
+            else:
+                artista = p1
+                musica = p2
+        elif len(partes) == 1:
+            musica = partes[0]
         else:
-            # Padrão padrão caso ambos tenham tamanhos parecidos
-            artista = p1
-            musica = p2
-            
-        # Se houver uma terceira parte e ela for curta (ex: participações ou bandas no fim)
-        if len(partes) > 2 and len(partes[-1].split()) <= 3:
-            # Se a última parte parecer um artista válido, podemos somar ou considerar
-            pass
-            
-    elif len(partes) == 1:
-        artista = "Desconhecido"
-        musica = partes[0]
-    else:
-        artista = "Desconhecido"
-        musica = titulo_bruto
-        
+            musica = titulo_bruto
+
     return artista, musica
 
 @app.route('/processar', methods=['POST'])
@@ -72,28 +64,32 @@ def processar_playlist():
         return jsonify({"erro": "Nenhum link enviado"}), 400
         
     try:
+        # Configuração para extrair informações completas, incluindo descrição
         ydl_opts = {
-            'extract_flat': True,
+            'extract_flat': False, # Mudado para False para garantir que traz detalhes como descrição se necessário, ou mantido leve
             'skip_download': True,
         }
         
         lista_musicas = []
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        # Nota: para extrair a descrição de playlists grandes sem travar, usamos o extract_flat com cautela ou varremos os itens
+        ydl_opts_flat = {
+            'extract_flat': 'in_playlist',
+            'skip_download': True,
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts_flat) as ydl:
             info = ydl.extract_info(link_youtube, download=False)
             
-            if 'entries' in info:
-                for entry in info['entries']:
-                    titulo_bruto = entry.get('title')
-                    artista, musica = limpar_titulo(titulo_bruto)
-                    
-                    lista_musicas.append({
-                        "titulo_original": titulo_bruto,
-                        "artista": artista,
-                        "musica": musica
-                    })
-            else:
-                titulo_bruto = info.get('title')
-                artista, musica = limpar_titulo(titulo_bruto)
+            entries = info.get('entries', [info])
+            for entry in entries:
+                if not entry:
+                    continue
+                titulo_bruto = entry.get('title')
+                # Tenta pegar a descrição se vier no pacote, senão busca o título limpo
+                descricao_bruta = entry.get('description', '')
+                
+                artista, musica = extrair_metadados(titulo_bruto, descricao_bruta)
+                
                 lista_musicas.append({
                     "titulo_original": titulo_bruto,
                     "artista": artista,
@@ -104,7 +100,7 @@ def processar_playlist():
             "status": "sucesso",
             "total_encontradas": len(lista_musicas),
             "musicas": lista_musicas,
-            "mensagem": "Músicas extraídas com reconhecimento de nomes!"
+            "mensagem": "Músicas extraídas analisando título e descrição!"
         })
         
     except Exception as e:
