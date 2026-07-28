@@ -1,11 +1,33 @@
 from flask import Flask, jsonify, request
 import yt_dlp
+import re
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
     return "Bot de Playlists da HaifaTools está rodando com sucesso!"
+
+def limpar_titulo(titulo_bruto):
+    if not titulo_bruto:
+        return "Desconhecido", "Desconhecido"
+    
+    # Tenta separar por hífen comum ou travessão (-)
+    partes = re.split(r'\s*[-–]\s*', titulo_bruto, maxsplit=1)
+    
+    if len(partes) == 2:
+        artista = partes[0].strip()
+        musica = partes[1].strip()
+    else:
+        artista = "Desconhecido"
+        musica = titulo_bruto.strip()
+        
+    # Remove sujeiras comuns do YouTube do título da música (ex: (Clipe Oficial), [Ao Vivo], etc)
+    musica = re.sub(r'\(.*?(oficial|live|ao vivo|clipe|video).*?\)', '', musica, flags=re.IGNORECASE)
+    musica = re.sub(r'\[.*?(oficial|live|ao vivo|clipe|video).*?\]', '', musica, flags=re.IGNORECASE)
+    musica = musica.strip()
+    
+    return artista, musica
 
 @app.route('/processar', methods=['POST'])
 def processar_playlist():
@@ -16,7 +38,6 @@ def processar_playlist():
         return jsonify({"erro": "Nenhum link enviado"}), 400
         
     try:
-        # Extrai as músicas da playlist de origem do YouTube
         ydl_opts = {
             'extract_flat': True,
             'skip_download': True,
@@ -28,21 +49,28 @@ def processar_playlist():
             
             if 'entries' in info:
                 for entry in info['entries']:
-                    titulo = entry.get('title')
+                    titulo_bruto = entry.get('title')
+                    artista, musica = limpar_titulo(titulo_bruto)
+                    
                     lista_musicas.append({
-                        "titulo": titulo
+                        "titulo_original": titulo_bruto,
+                        "artista": artista,
+                        "musica": musica
                     })
             else:
+                titulo_bruto = info.get('title')
+                artista, musica = limpar_titulo(titulo_bruto)
                 lista_musicas.append({
-                    "titulo": info.get('title')
+                    "titulo_original": titulo_bruto,
+                    "artista": artista,
+                    "musica": musica
                 })
 
-        # Retorna a lista extraída (pronta para ser enviada ao YouTube Music)
         return jsonify({
             "status": "sucesso",
             "total_encontradas": len(lista_musicas),
             "musicas": lista_musicas,
-            "mensagem": "Músicas extraídas com sucesso da playlist de origem!"
+            "mensagem": "Músicas extraídas e limpas com sucesso!"
         })
         
     except Exception as e:
