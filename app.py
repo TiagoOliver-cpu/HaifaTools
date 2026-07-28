@@ -12,37 +12,42 @@ def limpar_titulo(titulo_bruto):
     if not titulo_bruto:
         return "Desconhecido", "Desconhecido"
     
-    # Remove termos comuns de vídeo/performance do final ou meio
-    termo_limpeza = r'\b(clipe oficial|vídeo oficial|video oficial|ao vivo|live performance|live|dvd|medley|remix|ministração)\b'
-    limpo = re.sub(r'[\(\[].*?' + termo_limpeza + r'.*?[\)\]]', '', titulo_bruto, flags=re.IGNORECASE)
-    limpo = re.sub(termo_limpeza, '', limpo, flags=re.IGNORECASE)
-    limpo = limpo.strip()
+    # 1. Remove termos técnicos de gravação, câmeras e plataformas do meio do caminho
+    titulo_limpo = re.sub(r'\b(keycam|live performance|clipe oficial|vídeo oficial|video oficial|ao vivo|dvd|medley|remix|ministração)\b', '', titulo_bruto, flags=re.IGNORECASE)
     
-    # CASO 1: Se usa barra vertical "|" (ex: "Era Eu | Melk Villar")
-    # O contexto padrão da barra vertical costuma ser: Música | Artista
-    if '|' in limpo:
-        partes = limpo.split('|')
-        if len(partes) >= 2:
-            musica = partes[0].strip()
-            artista = partes[1].strip()
-            return artista, musica
-
-    # CASO 2: Se usa hífen ou travessão "-" (ex: "TU ÉS DEUS (A ELE) - O Canto das Igrejas, Paulo Cesar Baruk...")
-    # O contexto padrão da indústria musical é: Música - Artista (ou projeto/intérpretes)
-    if '-' in limpo or '–' in limpo:
-        partes = re.split(r'\s*[-–]\s*', limpo)
-        partes = [p.strip() for p in partes if p.strip()]
+    # Remove parênteses e colchetes vazios ou residuais
+    titulo_limpo = re.sub(r'[\(\[\{].*?[\)\]\}]', '', titulo_limpo)
+    
+    # 2. Divide os blocos por qualquer separador comum (- , – , |)
+    partes = re.split(r'\s*[-–|]\s*', titulo_limpo)
+    partes = [p.strip() for p in partes if p.strip()]
+    
+    if len(partes) >= 3:
+        # Se tem muitos blocos (ex: "Tu És Deus + Sublime", "KeyCam", "Francesco Xavier")
+        # O nome da música geralmente é o primeiro bloco
+        musica = partes[0]
+        # O artista real costuma estar no último bloco válido se o do meio for marca técnica
+        artista = partes[-1]
+    elif len(partes) == 2:
+        # Verifica se o padrão veio invertido (Música | Artista ou Artista - Música)
+        # Se a primeira parte tem características de música (frase longa/medley) e a segunda de artista
+        p1, p2 = partes[0], partes[1]
         
-        if len(partes) >= 2:
-            # O primeiro bloco é o nome da canção
-            musica = partes[0]
-            # Tudo o que vem depois do primeiro separador pertence ao contexto do(s) artista(s)/intérprete(s),
-            # mesmo que seja longo ou tenha vários nomes (juntamos se houver mais divisões)
-            artista = " - ".join(partes[1:])
-            return artista, musica
-
-    # Fallback se não encontrar nenhum separador
-    return "Desconhecido", limpo
+        # Se contiver "+" ou parecer título de canção no primeiro bloco e nome no segundo
+        if '+' in p1 or len(p1.split()) > 3:
+            musica = p1
+            artista = p2
+        else:
+            artista = p1
+            musica = p2
+    elif len(partes) == 1:
+        musica = partes[0]
+        artista = "Desconhecido"
+    else:
+        musica = titulo_bruto
+        artista = "Desconhecido"
+        
+    return artista, musica
 
 @app.route('/processar', methods=['POST'])
 def processar_playlist():
@@ -80,7 +85,7 @@ def processar_playlist():
             "status": "sucesso",
             "total_encontradas": len(lista_musicas),
             "musicas": lista_musicas,
-            "mensagem": "Músicas extraídas focando no contexto de intérpretes!"
+            "mensagem": "Músicas extraídas ignorando marcas técnicas!"
         })
         
     except Exception as e:
