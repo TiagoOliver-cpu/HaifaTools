@@ -1,6 +1,5 @@
-Flask
+flask
+flask-cors
 gunicorn
-requests
 yt-dlp
-google-auth-oauthlib
-google-api-python-client
+requests
