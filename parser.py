@@ -19,7 +19,7 @@ RUIDO = [
     "áudio oficial", "audio oficial", "official video", "official audio",
     "official music video", "lyric video", "lyrics", "legendado", "letra",
     "live performance", "ministração", "ministracao", "ao vivo", "live",
-    "medley", "remix", "keycam", "hd", "4k",
+    "medley", "remix", "cover", "keycam", "hd", "4k",
 ]
 # Segmentos que começam assim descrevem o álbum/projeto, não a música.
 PREFIXOS_ALBUM = ("dvd", "cd", "álbum", "album", "projeto")
@@ -35,7 +35,11 @@ def _norm(texto):
     return re.sub(r"\s+", " ", texto or "").strip(" -–—|,.:;").strip()
 
 
+_RE_EMOJI = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\u2B00-\u2BFF\u200d\ufe0f]")
+
+
 def _remover_ruido(texto):
+    texto = _RE_EMOJI.sub("", texto)
     def grupo(m):
         interno = _RE_RUIDO.sub("", m.group(1))
         interno = _norm(interno)
@@ -76,7 +80,7 @@ def _parece_musica(seg):
     return "+" in seg
 
 
-def limpar_titulo(titulo_bruto, canal=None):
+def _limpar_titulo_base(titulo_bruto, canal=None):
     """Retorna dict: artista, musica, confianca ('alta'|'media'|'baixa'), candidatos."""
     if not titulo_bruto:
         return {"artista": "Desconhecido", "musica": "Desconhecido",
@@ -121,3 +125,10 @@ def limpar_titulo(titulo_bruto, canal=None):
         candidatos.append(musica)
     return {"artista": artista, "musica": musica,
             "confianca": confianca, "candidatos": candidatos}
+
+
+def limpar_titulo(titulo_bruto, canal=None):
+    """Igual ao base, mais a flag 'medley' (várias músicas num vídeo só)."""
+    r = _limpar_titulo_base(titulo_bruto, canal)
+    r["medley"] = bool(re.search(r"\+|\s/\s", r["musica"] or ""))
+    return r

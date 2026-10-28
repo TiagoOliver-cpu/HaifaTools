@@ -5,6 +5,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from parser import limpar_titulo
+from ytmusic import criar_playlist_ytmusic
 
 app = Flask(__name__)
 CORS(app)  # libera chamadas vindas do navegador (Hoppscotch, front-end futuro)
@@ -51,7 +52,8 @@ def extrair_playlist(url):
             "video_id": entrada.get("id"),
             **dados,
         })
-    return info.get("title"), musicas
+    nome = " ".join((info.get("title") or "").split()) or None
+    return nome, musicas
 
 
 @app.route("/processar", methods=["POST"])
@@ -67,13 +69,27 @@ def processar_playlist():
         return jsonify({"erro": str(e)}), 500
 
     revisar = [m["titulo_original"] for m in musicas if m["confianca"] == "baixa"]
-    return jsonify({
+    resposta = {
         "status": "sucesso",
         "nome_playlist": nome,
         "total_encontradas": len(musicas),
         "para_revisar": revisar,
         "musicas": musicas,
-    })
+    }
+
+    # Opcional: {"criar_ytmusic": true, "privacidade": "UNLISTED"|"PUBLIC"|"PRIVATE"}
+    if dados.get("criar_ytmusic"):
+        privacidade = str(dados.get("privacidade", "UNLISTED")).upper()
+        if privacidade not in {"PUBLIC", "PRIVATE", "UNLISTED"}:
+            privacidade = "UNLISTED"
+        try:
+            resposta["ytmusic"] = criar_playlist_ytmusic(
+                musicas, dados.get("nome") or nome or "Playlist HaifaTools",
+                privacidade=privacidade)
+        except Exception as e:
+            resposta["ytmusic"] = {"erro": str(e)}
+
+    return jsonify(resposta)
 
 
 if __name__ == "__main__":

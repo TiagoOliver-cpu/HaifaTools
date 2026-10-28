@@ -14,6 +14,18 @@ CASOS = [
      None, "Francesco Xavier", "Tu És Deus + Sublime"),
     # com pista do canal
     ("Casa do Pai - Aline Barros", "Aline Barros", "Aline Barros", "Casa do Pai"),
+    # casos reais do teste da playlist "Domingo Noite"
+    ("JULLIANY SOUZA, GABRIELA ROCHA - GLORY TO CHRIST (LIVE)", "Julliany Souza",
+     "JULLIANY SOUZA, GABRIELA ROCHA", "GLORY TO CHRIST"),
+    ("GABRIELA ROCHA - EU NAVEGAREI (CLIPE OFICIAL) | EP CÉU", "Gabriela Rocha",
+     "GABRIELA ROCHA", "EU NAVEGAREI"),
+    ("Ester Oliveira | Eu navegarei + Então profetiza ❤️‍🔥 [Cover]", "Ester Oliveira",
+     "Ester Oliveira", "Eu navegarei + Então profetiza"),
+    ("Carol Braga | É Ele / Agnus Dei - Ministração Ao Vivo", "Carol Braga",
+     "Carol Braga", "É Ele / Agnus Dei"),
+    ("Sublime (Ao Vivo) | fhop music", "Fhop Music", "fhop music", "Sublime"),
+    ("Duda Pradino - Na Terra Como No Céu (Here as in Heaven)", "Duda Pradino",
+     "Duda Pradino", "Na Terra Como No Céu (Here as in Heaven)"),
     ("Pré-Venda de Fé - Fulano", "Fulano", "Fulano", "Pré-Venda de Fé"),
 ]
 
